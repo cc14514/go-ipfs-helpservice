@@ -10,9 +10,10 @@ import (
 	//host "gx/ipfs/Qmc1XhrFEiSeBNn3mpfg6gEuYCt5im2gYmNVmncsvmpeAk/go-libp2p-host"
 	//u "gx/ipfs/QmSU6eubNdhXjFBJBSksTp8kv8YRub8mGAPv8tVJHmL2EU/go-ipfs-util"
 	inet "gx/ipfs/QmNa31VPzC561NWwRsJLE7nGYZYuuD2QfpK2b1q9BK54J1/go-libp2p-net"
-	peer "gx/ipfs/QmXYjuNuxVzXKJCfWasQk1RqkhVLDM9jtUKhqc2WPQmFSB/go-libp2p-peer"
-	core "github.com/ipfs/go-ipfs/core"
+	"gx/ipfs/QmXYjuNuxVzXKJCfWasQk1RqkhVLDM9jtUKhqc2WPQmFSB/go-libp2p-peer"
+	"github.com/ipfs/go-ipfs/core"
 )
+
 //packet format : TYPE[2]FILEID[46]
 const PacketSize = 48
 
@@ -21,7 +22,8 @@ const ID = "/ipfs/help/1.0.0"
 const msgTimeout = time.Second * 60
 
 type HelpService struct {
-	n *core.IpfsNode
+	node  *core.IpfsNode
+	msgCh chan string
 }
 
 var helpService *HelpService
@@ -34,8 +36,9 @@ func GetInstance(n *core.IpfsNode) *HelpService {
 }
 
 func NewHelpService(n *core.IpfsNode) *HelpService {
-	helpService = &HelpService{n}
+	helpService = &HelpService{node: n, msgCh: make(chan string, 16)}
 	n.PeerHost.SetStreamHandler(ID, helpService.MsgHandler)
+	go helpService.startHandler()
 	dlog.Println("--> liangc:help_service_started <--")
 	return helpService
 }
@@ -72,27 +75,37 @@ func (p *HelpService) MsgHandler(s inet.Stream) {
 			errCh <- err
 			return
 		}
-
-		err = p.handler(string(buf))
-		switch err {
-		//TODO execute handler , if the queue was full , return error
-		default:
-			_, err = s.Write(buf)
-			if err != nil {
-				errCh <- err
-				return
-			}
+		p.msgCh <- string(buf)
+		if err != nil {
+			//TODO execute handler , if the queue was full , return error
+		}
+		_, err = s.Write(buf)
+		if err != nil {
+			errCh <- err
+			return
 		}
 		timer.Reset(msgTimeout)
 	}
 }
 
-func (ps *HelpService) Send(ctx context.Context, p peer.ID,m string) (<-chan time.Duration, error) {
-	s, err := ps.n.PeerHost.NewStream(ctx, p, ID)
+func (ps *HelpService) MyPeerIDs() []peer.ID {
+	conns := ps.node.PeerHost.Network().Conns()
+	if conns == nil {
+		return nil
+	}
+	l := make([]peer.ID,len(conns))
+	for i, c := range conns {
+		pid := c.RemotePeer()
+		l[i] = pid
+	}
+	return l
+}
+
+func (ps *HelpService) Send(ctx context.Context, p peer.ID, m string) (<-chan time.Duration, error) {
+	s, err := ps.node.PeerHost.NewStream(ctx, p, ID)
 	if err != nil {
 		return nil, err
 	}
-
 	out := make(chan time.Duration)
 	go func() {
 		defer close(out)
@@ -102,7 +115,7 @@ func (ps *HelpService) Send(ctx context.Context, p peer.ID,m string) (<-chan tim
 			case <-ctx.Done():
 				return
 			default:
-				t, err := send(s,m)
+				t, err := send(s, m)
 				if err != nil {
 					s.Reset()
 					dlog.Printf("--> help error: %s", err)
@@ -117,11 +130,11 @@ func (ps *HelpService) Send(ctx context.Context, p peer.ID,m string) (<-chan tim
 			}
 		}
 	}()
-	dlog.Println("🙏 ====>",m)
+	dlog.Println("🙏 ====>", m)
 	return out, nil
 }
 
-func send(s inet.Stream,m string) (time.Duration, error) {
+func send(s inet.Stream, m string) (time.Duration, error) {
 	buf := []byte(m)
 	before := time.Now()
 	_, err := s.Write(buf)
