@@ -1,0 +1,12 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "pQ4jskRqLDjKNiPhGvowS9dV8sM=",
+			"path": "debuglogger",
+			"revision": ""
+		}
+	],
+	"rootPath": "github.com/cc14514/go-ipfs-helpservice"
+}
