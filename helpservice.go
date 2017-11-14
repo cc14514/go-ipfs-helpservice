@@ -11,7 +11,7 @@ import (
 	//u "gx/ipfs/QmSU6eubNdhXjFBJBSksTp8kv8YRub8mGAPv8tVJHmL2EU/go-ipfs-util"
 	inet "gx/ipfs/QmNa31VPzC561NWwRsJLE7nGYZYuuD2QfpK2b1q9BK54J1/go-libp2p-net"
 	"gx/ipfs/QmXYjuNuxVzXKJCfWasQk1RqkhVLDM9jtUKhqc2WPQmFSB/go-libp2p-peer"
-	"github.com/ipfs/go-ipfs/core"
+	"github.com/cc14514/go-ipfs/core"
 )
 
 //packet format : TYPE[2]FILEID[46]
